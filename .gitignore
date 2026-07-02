@@ -1,0 +1,24 @@
+# Secrets
+.env
+
+# Personal inputs (share the .example versions, not these)
+data/cv.md
+apify_input.json
+
+# Generated reports + scraped data (keep the folder, ignore its contents)
+output/*
+!output/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/

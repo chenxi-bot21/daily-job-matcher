@@ -1,0 +1,17 @@
+{
+    "keyword": [
+        "credit risk analyst",
+        "risk analyst",
+        "data analyst"
+    ],
+    "locations": [
+        "Singapore",
+        "Hong Kong"
+    ],
+    "maxItems": 150,
+    "publishedAt": "r86400",
+    "saveOnlyUniqueItems": true,
+    "enrichCompanyData": false,
+    "excludeRecruitingAgencies": true,
+    "filterEasyApply": false
+}

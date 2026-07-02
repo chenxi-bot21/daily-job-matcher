@@ -1,0 +1,11 @@
+# Core (heuristic scoring + CV parsing + report)
+scikit-learn>=1.4
+python-docx>=1.1
+
+# Optional — only needed for LLM re-scoring (python -m jobscreener run with ANTHROPIC_API_KEY)
+anthropic>=0.40,<1.0
+
+# Optional — only needed for live scraping via `--source jobspy`
+# (not needed for `--jobs jobspy_export.csv`, which uses the standard library)
+python-jobspy>=1.1
+
