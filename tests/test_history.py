@@ -28,6 +28,15 @@ class HistoryTests(unittest.TestCase):
             history.record_seen(p, ["a", "", None])
             self.assertEqual(history.load_seen(p), {"a"})
 
+    def test_content_key_normalises_and_matches_reposts(self):
+        base = history.content_key("Citi", "KYC Operations Analyst")
+        # Case, spacing and punctuation differences collapse to the same key.
+        self.assertEqual(base, history.content_key("  citi ", "KYC   Operations, Analyst!"))
+        # A different title does not collide.
+        self.assertNotEqual(base, history.content_key("Citi", "Data Analyst"))
+        # Always contains the separator, so it can't collide with a raw board id.
+        self.assertIn("|", history.content_key("A", "B"))
+
 
 if __name__ == "__main__":
     unittest.main()

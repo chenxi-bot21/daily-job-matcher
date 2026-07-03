@@ -85,6 +85,28 @@ def _cmd_run(args) -> int:
     json_path.write_text(json.dumps(top_json, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"JSON:   {json_path}")
 
+    # Full curation dump — EVERY candidate that passed the knock-out gate, with
+    # its full job description, score and reasons. This is what a human (or
+    # another session) reads to hand-curate true fit; the top-N above is only a
+    # first pass. Written on every run so the JDs are never lost.
+    full = [{
+        "score": round(s.score, 1), "title": s.job.title, "company": s.job.company,
+        "location": s.job.location, "seniority": s.job.seniority, "url": s.job.url,
+        "matched": s.matched_skills, "reasons": s.reasons,
+        "description": s.job.description,
+    } for s in result.all_scored]
+    full_path = settings.output_dir / "candidates_full.json"
+    full_path.write_text(json.dumps(full, ensure_ascii=False, indent=1), encoding="utf-8")
+    print(f"Full:   {full_path}  ({len(full)} candidates with JDs)")
+
+    # For live sources, also persist the raw fetched postings so the exact run
+    # can be re-screened offline without re-scraping (and re-paying):
+    #   python -m jobscreener run --source sample --jobs output/fetched.json
+    if args.source in ("apify", "remotive", "jobspy") and result.raws:
+        fetched_path = settings.output_dir / "fetched.json"
+        fetched_path.write_text(json.dumps(result.raws, ensure_ascii=False), encoding="utf-8")
+        print(f"Raw:    {fetched_path}  ({len(result.raws)} fetched)")
+
     # Push to Notion when configured (or forced with --notion).
     from . import notion
     if notion.notion_configured() and not args.no_notion:

@@ -8,9 +8,23 @@ grow without bound.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 _KEEP_LAST = 5000
+_KEY_RE = re.compile(r"[^a-z0-9]+")
+
+
+def content_key(company: str, title: str) -> str:
+    """A stable id for "the same job" independent of the posting's board id.
+
+    LinkedIn re-posts an unchanged role under a *new* job id, so id-only history
+    lets reposts slip back into the digest. Keying on normalised company+title
+    catches those. Collision-safe with raw ids (this always contains a ``|``).
+    """
+    c = _KEY_RE.sub(" ", (company or "").lower()).strip()
+    t = _KEY_RE.sub(" ", (title or "").lower()).strip()
+    return f"{c}|{t}"
 
 
 def _load_list(path: Path) -> list[str]:

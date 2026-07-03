@@ -44,6 +44,29 @@ class PipelineTests(unittest.TestCase):
             self.assertEqual(result.meta["dropped"]["over_experienced"], 1)
             self.assertFalse(result.meta["llm_used"])
 
+    def test_exclude_seen_catches_repost_with_new_id(self):
+        with tempfile.TemporaryDirectory() as d:
+            tmp = Path(d)
+            s = self._settings(tmp)
+            s.output_dir = tmp                      # isolate seen_jobs.json
+            # First run surfaces the Credit Risk Analyst and records it as seen.
+            r1 = run_screening(s, exclude_seen=True)
+            self.assertEqual(len(r1.top), 1)
+            # Re-post the SAME role under a new URL -> a new board id.
+            reposted = list(_JOBS)
+            reposted[0] = {**_JOBS[0], "url": "https://example.com/brand-new-id"}
+            (tmp / "jobs.json").write_text(json.dumps(reposted), encoding="utf-8")
+            r2 = run_screening(s, exclude_seen=True)
+            # Recognised as already-seen via company+title, despite the new id.
+            self.assertEqual(len(r2.top), 0)
+            self.assertGreaterEqual(r2.meta["n_seen_skipped"], 1)
+
+    def test_result_exposes_fetched_raws(self):
+        with tempfile.TemporaryDirectory() as d:
+            s = self._settings(Path(d))
+            result = run_screening(s)
+            self.assertEqual(len(result.raws), 4)   # all fetched postings, verbatim
+
     def test_report_html_renders(self):
         with tempfile.TemporaryDirectory() as d:
             s = self._settings(Path(d))

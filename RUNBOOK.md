@@ -19,13 +19,18 @@ should follow that file, not assumptions. Keep the hard constraints in
 Run everything from the `job_screener/` directory. On this machine the `python`
 on PATH is a broken Store stub — use the full interpreter path (see memory) or `py`.
 
-1. **Scrape** the last 24 h (costs ~$0.10 of Apify credit):
-   `python -m jobscreener run --source apify --apify-input apify_input.json`
-   — this runs the saved Apify LinkedIn task and writes `output/apify_raw.json`.
-   (Search terms / locations / freshness live in `apify_input.json`.)
-2. **Screen + dump full JDs.** The heuristic *rank* is noisy — do **not** trust it
-   blindly. Run the screening on `apify_raw.json` and export the candidates that
-   pass the knockout gate **with their full descriptions** to read.
+1. **Scrape + screen** the last 24 h (costs ~$0.2–0.3 of Apify credit at
+   `maxItems: 400`):
+   `python -m jobscreener run --source apify --apify-input apify_input.json --exclude-seen`
+   — runs the saved Apify LinkedIn task and writes, in `output/`: `top_jobs.json`
+   (top-N), `candidates_full.json` (**every** knock-out-gate survivor **with its
+   full JD**, score and reasons), `fetched.json` (all raw postings, re-screenable
+   offline via `--source sample --jobs output/fetched.json`), and the HTML report.
+   (Search terms / locations / freshness live in `apify_input.json`; `maxItems` is
+   a **global** cap — keep it high or one keyword starves the rest.)
+2. **Read the full JDs.** The heuristic *rank* is noisy — do **not** trust it
+   blindly. Open `output/candidates_full.json` and read the descriptions; that file
+   is produced automatically by step 1, so no separate export is needed.
 3. **Read the full JDs and hand-curate by true fit.** The knockout gate already
    removes ineligible / over-experienced / PhD-only roles; your job is the soft
    judgement: down-rank trading / AI-engineer / robotics / pure-SWE, and flag any

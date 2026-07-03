@@ -23,6 +23,7 @@ class ScreeningResult:
     top: list[ScoredJob]                 # the top-N shortlist for the report
     all_scored: list[ScoredJob]          # every job that passed filters, ranked
     meta: dict = field(default_factory=dict)
+    raws: list[dict] = field(default_factory=list)   # the fetched postings, verbatim
 
 
 def run_screening(settings: Settings, source: JobSource | None = None,
@@ -37,12 +38,16 @@ def run_screening(settings: Settings, source: JobSource | None = None,
     # 5. Normalise, then 6. de-duplicate (within this run).
     jobs = deduplicate(normalize_all(raws))
 
-    # 6b. Cross-run de-dup: drop jobs already surfaced in earlier runs.
+    # 6b. Cross-run de-dup: drop jobs already surfaced in earlier runs. Match on
+    # either the board id OR the normalised company+title, so a LinkedIn repost
+    # (same role, new id) is still recognised as already-seen.
     n_seen_skipped = 0
     if exclude_seen:
         seen = history.load_seen(settings.seen_path)
         before = len(jobs)
-        jobs = [j for j in jobs if j.id not in seen]
+        jobs = [j for j in jobs
+                if j.id not in seen
+                and history.content_key(j.company, j.title) not in seen]
         n_seen_skipped = before - len(jobs)
 
     # 7. Hard filters (knock-out gate).
@@ -64,9 +69,12 @@ def run_screening(settings: Settings, source: JobSource | None = None,
     # 10. Select top-N above the score floor.
     top = [s for s in scored if s.score >= settings.min_score][: settings.top_n]
 
-    # Remember what we surfaced so future runs don't repeat it.
+    # Remember what we surfaced so future runs don't repeat it — store both the
+    # id and the company+title key, so reposts are caught next time too.
     if exclude_seen:
-        history.record_seen(settings.seen_path, [s.job.id for s in top])
+        surfaced = [s.job.id for s in top]
+        surfaced += [history.content_key(s.job.company, s.job.title) for s in top]
+        history.record_seen(settings.seen_path, surfaced)
 
     meta = {
         "n_fetched": len(raws),
@@ -78,4 +86,4 @@ def run_screening(settings: Settings, source: JobSource | None = None,
         "cv_skills": cv.skills,
         "source": source.name,
     }
-    return ScreeningResult(top=top, all_scored=scored, meta=meta)
+    return ScreeningResult(top=top, all_scored=scored, meta=meta, raws=raws)
