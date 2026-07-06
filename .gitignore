@@ -22,3 +22,6 @@ dist/
 .DS_Store
 .vscode/
 .idea/
+
+# uv creates this when the sidecar runs from the project dir; not a uv project
+uv.lock

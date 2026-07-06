@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import os
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -298,3 +299,80 @@ class RemotiveSource:
                 "source": "remotive",
             })
         return out
+
+
+def map_mcf_item(item: dict, description: str = "") -> dict:
+    """Map one MyCareersFuture search result to our raw schema. Pure/testable.
+
+    The search endpoint omits the description, so it's passed in separately (from
+    the per-job detail endpoint).
+    """
+    company = (item.get("postedCompany") or item.get("hiringCompany") or {}).get("name", "")
+    meta = item.get("metadata") or {}
+    emp = item.get("employmentTypes") or []
+    return {
+        "title": item.get("title", ""),
+        "company": company,
+        "location": "Singapore",                      # MyCareersFuture is SG-only
+        "description": description,
+        "url": meta.get("jobDetailsUrl", ""),
+        "posted_days_ago": _days_since(meta.get("newPostingDate")),
+        "employment_type": emp[0].get("employmentType", "") if emp else "",
+        "source": "mycareersfuture",
+    }
+
+
+class MyCareersFutureSource:
+    """Free, official Singapore source: MyCareersFuture (Workforce Singapore).
+
+    A public JSON API — no key, no scraping, no ToS grey-area. Singapore-only.
+    The search endpoint doesn't include the job description, so by default we
+    fetch each posting's detail page to fill it in (needed for skill scoring).
+    Network failures raise so a caller can fall back to another source.
+    """
+
+    name = "mycareersfuture"
+    SEARCH = "https://api.mycareersfuture.gov.sg/v2/search"
+    DETAIL = "https://api.mycareersfuture.gov.sg/v2/jobs/{uuid}"
+    _UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+           "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
+
+    def __init__(self, search: str = "credit risk analyst", results: int = 30,
+                 fetch_descriptions: bool = True):
+        self.search = search
+        self.results = results
+        self.fetch_descriptions = fetch_descriptions
+
+    def _search_page(self, page: int, limit: int) -> list[dict]:
+        body = json.dumps({"search": self.search, "sessionId": "jobscreener"}).encode("utf-8")
+        req = urllib.request.Request(
+            f"{self.SEARCH}?limit={limit}&page={page}", data=body,
+            headers={"Content-Type": "application/json", "Accept": "application/json",
+                     "User-Agent": self._UA})
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read().decode("utf-8")).get("results", [])
+
+    def _description(self, uuid: str) -> str:
+        try:
+            req = urllib.request.Request(self.DETAIL.format(uuid=uuid),
+                                         headers={"Accept": "application/json", "User-Agent": self._UA})
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                return json.loads(resp.read().decode("utf-8")).get("description", "") or ""
+        except (urllib.error.URLError, ValueError, TimeoutError):
+            return ""                                   # description is best-effort
+
+    def fetch(self) -> list[dict]:  # pragma: no cover - network
+        items: list[dict] = []
+        page, limit = 0, min(self.results, 100)
+        while len(items) < self.results:
+            batch = self._search_page(page, limit)
+            if not batch:
+                break
+            items.extend(batch)
+            if len(batch) < limit:
+                break
+            page += 1
+        items = items[: self.results]
+        return [map_mcf_item(it, self._description(it["uuid"])
+                             if self.fetch_descriptions and it.get("uuid") else "")
+                for it in items]

@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 from jobscreener.sources import (ApifyFileSource, ApifySource, _coerce_str, _days_since,
-                                 map_apify_item, map_jobspy_row)
+                                 map_apify_item, map_jobspy_row, map_mcf_item)
 
 
 class ApifyMappingTests(unittest.TestCase):
@@ -79,6 +79,32 @@ class ApifyInputTests(unittest.TestCase):
     def test_task_without_override_sends_saved_input(self):
         # No input_json + a task -> None body -> the task's saved input is used.
         self.assertIsNone(ApifySource(token="x", task="t")._build_input())
+
+
+class MyCareersFutureMappingTests(unittest.TestCase):
+    def test_maps_search_item_with_injected_description(self):
+        item = {
+            "uuid": "abc123", "title": "Credit Risk Analyst",
+            "postedCompany": {"name": "Bank of China"},
+            "employmentTypes": [{"employmentType": "Full Time"}],
+            "metadata": {"newPostingDate": datetime.date.today().isoformat(),
+                         "jobDetailsUrl": "https://mycareersfuture.gov.sg/job/abc123"},
+        }
+        out = map_mcf_item(item, description="PD scorecard, IFRS 9, Python")
+        self.assertEqual(out["title"], "Credit Risk Analyst")
+        self.assertEqual(out["company"], "Bank of China")
+        self.assertEqual(out["location"], "Singapore")
+        self.assertEqual(out["description"], "PD scorecard, IFRS 9, Python")
+        self.assertEqual(out["url"], "https://mycareersfuture.gov.sg/job/abc123")
+        self.assertEqual(out["posted_days_ago"], 0)
+        self.assertEqual(out["source"], "mycareersfuture")
+
+    def test_falls_back_to_hiring_company_and_tolerates_gaps(self):
+        out = map_mcf_item({"title": "Analyst", "hiringCompany": {"name": "Acme"}})
+        self.assertEqual(out["company"], "Acme")
+        self.assertEqual(out["description"], "")     # none injected
+        self.assertEqual(out["employment_type"], "")
+        self.assertEqual(out["posted_days_ago"], 0)
 
 
 class JobSpyMappingTests(unittest.TestCase):

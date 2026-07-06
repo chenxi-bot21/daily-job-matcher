@@ -49,14 +49,16 @@ class HeuristicScorerTests(unittest.TestCase):
 
     def test_focus_boosts_modelling_over_generic_same_description(self):
         # Identical description; only the title differs. The scarce modelling role
-        # must outrank the generic KYC role thanks to the focus adjustment.
+        # must outrank a generic low-fit title thanks to the focus adjustment.
+        # (AML/KYC are NO LONGER de-prioritised as of 2026-07-04 — they're a real
+        # target track now — so use a still-deprioritised title here: credit control.)
         desc = "Credit risk, python, sql, portfolio monitoring for a bank."
         modelling = self._job("Credit Risk Modelling Analyst", desc)
-        generic = self._job("KYC Analyst", desc)
+        generic = self._job("Credit Control Analyst", desc)
         by = {s.job.title: s for s in HeuristicScorer(self.s, self.cv).score_all([modelling, generic])}
-        self.assertGreater(by["Credit Risk Modelling Analyst"].score, by["KYC Analyst"].score)
+        self.assertGreater(by["Credit Risk Modelling Analyst"].score, by["Credit Control Analyst"].score)
         self.assertTrue(any("Priority" in r for r in by["Credit Risk Modelling Analyst"].reasons))
-        self.assertTrue(any("De-prioritised" in r for r in by["KYC Analyst"].reasons))
+        self.assertTrue(any("De-prioritised" in r for r in by["Credit Control Analyst"].reasons))
 
 
 class LLMParseTests(unittest.TestCase):

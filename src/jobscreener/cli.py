@@ -13,7 +13,7 @@ from .report import build_html, write_report
 import os
 
 from .sources import (ApifyFileSource, ApifySource, JobSpyCsvSource, JobSpySource,
-                      RemotiveSource, SampleFileSource)
+                      MyCareersFutureSource, RemotiveSource, SampleFileSource)
 
 
 def _cmd_run(args) -> int:
@@ -26,7 +26,11 @@ def _cmd_run(args) -> int:
         settings.top_n = args.top
 
     source = None
-    if args.source == "remotive":
+    if args.source == "mcf":
+        source = MyCareersFutureSource(
+            search=args.search or settings.profile.target_roles[0],
+            results=args.results or 30)
+    elif args.source == "remotive":
         source = RemotiveSource(search=args.search or "analyst")
     elif args.source == "apify":
         input_json = None
@@ -129,7 +133,7 @@ def build_parser() -> argparse.ArgumentParser:
     r = sub.add_parser("run", help="screen jobs and build the report")
     r.add_argument("--cv", help="path to your CV (.md/.txt/.docx/.pdf)")
     r.add_argument("--jobs", help="path to a postings JSON file")
-    r.add_argument("--source", choices=["sample", "remotive", "apify", "apify-file", "jobspy"],
+    r.add_argument("--source", choices=["sample", "mcf", "remotive", "apify", "apify-file", "jobspy"],
                    default="sample", help="job source (default: bundled sample file)")
     r.add_argument("--search", help="search term for the remotive/apify/jobspy source")
     r.add_argument("--location", help="location filter, e.g. 'Hong Kong'")

@@ -16,6 +16,11 @@ should follow that file, not assumptions. Keep the hard constraints in
 `needs_visa_sponsorship`, `highest_degree`) in sync with the CV.
 
 ## Daily cycle (when the user asks for "today's jobs")
+> **Full multi-source daily process (LinkedIn + Indeed + MyCareersFuture → curate
+> → Notion with apply links): [`docs/DAILY_PLAYBOOK.md`](docs/DAILY_PLAYBOOK.md).**
+> The steps below are the LinkedIn/Apify core; the playbook wraps all three sources
+> and the "truly-fit" curation bar.
+
 Run everything from the `job_screener/` directory. On this machine the `python`
 on PATH is a broken Store stub — use the full interpreter path (see memory) or `py`.
 
@@ -46,6 +51,28 @@ on PATH is a broken Store stub — use the full interpreter path (see memory) or
 > Use `--exclude-seen` on step 1 to skip jobs already surfaced on earlier days
 > (ids logged to `output/seen_jobs.json`), so the digest never repeats.
 
+### Free sources — no paid API (SG + HK)
+Two free sources supplement the Apify LinkedIn pull; the pipeline's `deduplicate()`
+merges any overlap. Full research + rationale: [`docs/JOB_SOURCES.md`](docs/JOB_SOURCES.md).
+
+- **MyCareersFuture (SG, official API, zero deploy)** — runs on our Python 3.14:
+  ```
+  python -m jobscreener run --source mcf --search "credit risk analyst" --results 40 --exclude-seen
+  ```
+- **Indeed (SG + HK, via the JobSpy sidecar)** — the good JobSpy pins an old numpy
+  with no 3.14 wheel, so run it in an isolated Python 3.12 via `uv`, then ingest the
+  CSV on 3.14:
+  ```
+  uv run --python 3.12 --with python-jobspy scripts/fetch_indeed.py \
+      --search "credit risk analyst" --location Singapore --country Singapore --out output/indeed_sg.csv
+  python -m jobscreener run --source sample --jobs output/indeed_sg.csv --exclude-seen
+  ```
+  ⚠️ **Windows note:** if `--python 3.12` errors with *"Missing expected target
+  directory … minor version link"* (uv can't make the symlink without Developer
+  Mode), point `--python` at the interpreter directly, e.g.
+  `--python "$env:APPDATA\uv\python\cpython-3.12.13-windows-x86_64-none\python.exe"`.
+  Do **not** `pip install -U python-jobspy` into the 3.14 env — it breaks numpy.
+
 ### Application tracking (same table)
 When asked to "read email / update statuses": search Gmail for job-application
 confirmations, rejections, and interview invites (see the Gmail MCP), then update
@@ -54,9 +81,10 @@ the matching rows' **Status** in the master table (`Applied` / `Rejected` /
 (Source = `Email`). Everything lives in the one "Job Search Tracker" table.
 
 ## Why this shape (important gotchas)
-- **Python 3.14** blocks live JobSpy (its deps pin an old numpy with no 3.14
-  wheel) and Indeed returns 403 — that's why the source is **Apify** (runs on
-  Apify's servers, no local scraping).
+- **Apify** is the default LinkedIn source (server-side, best LinkedIn coverage).
+  For free alternatives see "Free sources" above: the *latest* JobSpy pins an old
+  numpy with no 3.14 wheel (so it needs the `uv` 3.12 sidecar), and its Indeed
+  scraper's GraphQL path now clears the old 403 — verified for SG and HK.
 - The **Notion MCP only works inside an interactive session**, so a cron job
   can't write to Notion. The daily cycle is therefore **on-command**, not a
   scheduled task (the earlier scheduled task was removed).
