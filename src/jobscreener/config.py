@@ -63,9 +63,10 @@ class CandidateProfile:
         "survival analysis", "propensity score", "regression", "time series",
         "biostatistics", "clinical", "epidemiology", "financial econometrics",
     ])
+    # US removed 2026-07 — the user is no longer searching there.
     preferred_locations: list[str] = field(default_factory=lambda: [
         "hong kong", "singapore", "china", "beijing", "shanghai", "shenzhen",
-        "new york", "united states", "usa", "remote",
+        "remote",
     ])
     max_experience_years: int = 3          # entry / early-career
     accept_internships: bool = True
@@ -101,14 +102,13 @@ class ScreeningRules:
         "senior", "lead ", "principal", "staff ", "head of", "director",
         "vice president", "manager,", "10+ years", "8+ years", "7+ years",
     ])
-    # Generic / abundant-local-talent titles to push DOWN (a penalty, not a
-    # knock-out — still a fallback). A foreign new grad is rarely sponsored over
-    # a local candidate for these, so they should rank below the scarce, modelling
-    # roles in CandidateProfile.priority_title_keywords. Matched against the TITLE.
-    # (A title that hits both a priority and a deprioritise term — e.g. "AML Data
-    # Scientist" — nets roughly neutral, which is the intended behaviour.)
+    # Generic / low-fit titles to push DOWN (a penalty, not a knock-out). These
+    # rank below the scarce modelling/quant roles in priority_title_keywords.
+    # Matched against the TITLE. NOTE (2026-07-04): AML/KYC/compliance were REMOVED
+    # from this list — they are a genuine, winnable target track for this candidate
+    # (she applies to and gets responses from them), so the pipeline no longer
+    # both searches for and penalises them.
     deprioritize_title_keywords: list[str] = field(default_factory=lambda: [
-        "kyc", "kyb", "aml", "anti-money", "know your customer", "compliance",
         "accounts receivable", "credit control", "collections", "underwriter",
         "underwriting", "audit", "business analyst", "administrator", "clerk",
     ])
