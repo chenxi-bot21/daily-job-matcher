@@ -1,4 +1,8 @@
-"""Free Indeed (SG + HK) fetcher — the JobSpy sidecar, multi-term in one run.
+"""Free multi-board (SG + HK) fetcher — the JobSpy sidecar, multi-term in one run.
+
+Sites (2026-07-22): Indeed + Glassdoor + Google Jobs (all free, all SG-capable;
+Google Jobs indirectly surfaces eFinancialCareers / company-site / MCF postings).
+Select with --sites; output stays one de-duplicated CSV for the screener.
 
 The latest ``python-jobspy`` (working Indeed GraphQL scraper) pins an old numpy
 with no Python 3.14 wheel, so it can't live in the screener's 3.14 env. Run it in
@@ -31,6 +35,8 @@ DEFAULT_TERMS = ["credit risk analyst", "risk analyst", "credit analyst",
                  "data analyst", "quantitative analyst", "graduate analyst"]
 # "Location:country_indeed" pairs.
 DEFAULT_LOCATIONS = ["Singapore:Singapore", "Hong Kong:Hong Kong"]
+# Free boards JobSpy can hit for SG/HK (country_indeed also steers Glassdoor).
+DEFAULT_SITES = ["indeed", "glassdoor", "google"]
 
 
 def main(argv=None) -> int:
@@ -39,7 +45,9 @@ def main(argv=None) -> int:
                    help="comma-separated search terms")
     p.add_argument("--locations", default=",".join(DEFAULT_LOCATIONS),
                    help="comma-separated 'Location:country_indeed' pairs")
-    p.add_argument("--results", type=int, default=25, help="results wanted per (term, location)")
+    p.add_argument("--sites", default=",".join(DEFAULT_SITES),
+                   help="comma-separated JobSpy sites (indeed,glassdoor,google)")
+    p.add_argument("--results", type=int, default=25, help="results wanted per (site, term, location)")
     p.add_argument("--hours-old", type=int, default=24, help="max age in hours (24 = last day)")
     p.add_argument("--out", default="output/indeed_24h.csv", help="output CSV path")
     args = p.parse_args(argv)
@@ -57,22 +65,33 @@ def main(argv=None) -> int:
     terms = [t.strip() for t in args.terms.split(",") if t.strip()]
     locations = [pair.split(":", 1) for pair in args.locations.split(",") if pair.strip()]
 
+    sites = [s.strip().lower() for s in args.sites.split(",") if s.strip()]
+
     frames = []
     for loc, country in locations:
         loc, country = loc.strip(), country.strip()
         for term in terms:
-            kwargs = {"site_name": ["indeed"], "search_term": term, "location": loc,
-                      "results_wanted": args.results, "country_indeed": country}
-            if "hours_old" in supported:
-                kwargs["hours_old"] = args.hours_old
-            try:
-                df = scrape_jobs(**kwargs)
-                n = 0 if df is None else len(df)
-                print(f"  {country:10} | {term:22} -> {n}")
-                if n:
-                    frames.append(df)
-            except Exception as e:                                # keep going on a bad query
-                print(f"  {country:10} | {term:22} -> ERR {type(e).__name__}: {str(e)[:60]}")
+            for site in sites:
+                kwargs = {"site_name": [site], "results_wanted": args.results}
+                if site == "google":
+                    # Google Jobs ignores search_term/location; it wants one phrase.
+                    gq = f"{term} jobs in {loc} since yesterday"
+                    if "google_search_term" not in supported:
+                        continue                                   # too-old jobspy: skip google
+                    kwargs["google_search_term"] = gq
+                else:
+                    kwargs.update({"search_term": term, "location": loc,
+                                   "country_indeed": country})
+                    if "hours_old" in supported:
+                        kwargs["hours_old"] = args.hours_old
+                try:
+                    df = scrape_jobs(**kwargs)
+                    n = 0 if df is None else len(df)
+                    print(f"  {country:10} | {site:9} | {term:22} -> {n}")
+                    if n:
+                        frames.append(df)
+                except Exception as e:                            # keep going on a bad query
+                    print(f"  {country:10} | {site:9} | {term:22} -> ERR {type(e).__name__}: {str(e)[:60]}")
 
     if not frames:
         print("no rows")
